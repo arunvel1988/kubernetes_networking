@@ -14,3 +14,11 @@ kube-controller-manager
 cloud-controller-manager (optional)
  | Manages cloud-specific stuff (load balancers, IPs, etc) | Cloud-specific automation stops working (e.g., new LoadBalancers won't be created)
  ###################################################
+
+
+kubelet | Talks to the control plane and manages Pods on the node | Node becomes "NotReady", Pods may eventually be rescheduled elsewhere.
+kube-proxy | Manages networking rules for Services | Service traffic (ClusterIP/NodePort) can break or be unstable.
+container runtime (like containerd) | Runs the actual containers | Containers won't start/stop properly on the node.
+
+
+ ###################################################
