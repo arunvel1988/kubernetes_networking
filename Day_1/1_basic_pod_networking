@@ -1,0 +1,43 @@
+kubectl get pods -o wide
+
+
+kubectl run nginx --image=nginx --restart=Never
+kubectl get pods -o wide
+
+
+kubectl run busybox --image=busybox --restart=Never -- sleep 3600
+kubectl get pods -o wide
+
+
+
+kubectl exec -it busybox -- ping <nginx-pod-IP>
+
+
+kubectl expose pod nginx --port=80 --target-port=80 --name=nginx-service
+
+
+kubectl get svc
+
+
+kubectl exec -it busybox -- nslookup nginx-service
+
+
+kubectl exec -it busybox -- wget -O- nginx-service
+
+kubectl expose pod nginx --port=80 --type=NodePort --name=nginx-nodeport
+kubectl get svc
+
+
+kubectl get nodes -o wide
+
+curl http://<Node-IP>:<NodePort>
+
+
+ls /etc/cni/net.d/
+
+kubectl get pods -n kube-system -l k8s-app=kube-dns
+
+
+kubectl exec -it busybox -- nslookup nginx-service
+
+
