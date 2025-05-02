@@ -1,0 +1,70 @@
+Step 1: kubeadm creates a root CA (ca.crt, ca.key)
+
+Step 2: It generates CSRs (Certificate Signing Requests) for:
+  - API server
+  - Controller manager
+  - Scheduler
+  - Kubelets
+  - etcd (has its own CA too)
+
+Step 3: The CA signs the CSRs and creates certs
+
+Step 4: These certs are written to /etc/kubernetes/pki/
+
+docker exec -it kind-control-plane bash
+cd /etc/kubernetes/pki
+ls
+
+
+File | Purpose
+ca.crt, ca.key | ✅ The Root Certificate Authority
+apiserver.crt, apiserver.key | Signed by ca
+apiserver-kubelet-client.crt | Signed by ca
+apiserver-etcd-client.crt | Signed by etcd/ca.crt
+etcd/ca.crt, etcd/ca.key | A separate CA for etcd
+etcd/server.crt, etcd/server.key | Signed by etcd/ca
+
+
+
+
+kubeadm creates the certificates when the cluster is initialized.  
+In kubeadm setups: You run `kubeadm init` yourself
+
+
+The cluster’s own Certificate Authority (CA) signs the certs.  
+This CA is created by `kubeadm` during cluster setup.
+
+Specifically:
+- A **self-signed CA** is created:
+  - `ca.crt` (public cert)
+  - `ca.key` (private key)
+- This CA is then used to sign:
+  - `apiserver.crt`
+  - `apiserver-kubelet-client.crt`
+  - `controller-manager.crt`
+  - etc.
+
+
+
+
+
+| Action               | Who Performs It           |
+|----------------------|---------------------------|
+| Generate root CA     | `kubeadm` (during init)   |
+| Generate cert/key    | `kubeadm` or controller   |
+| Sign certs           | **Cluster CA (`ca.key`)** |
+| Use of signed certs  | API server, etcd, kubelet |
+
+
+
+
+docker exec -it kind-control-plane bash
+cd /etc/kubernetes/pki
+openssl x509 -in apiserver.crt -text -noout
+
+
+
+Issuer: CN = kubernetes
+Subject: CN = kube-apiserver
+
+
