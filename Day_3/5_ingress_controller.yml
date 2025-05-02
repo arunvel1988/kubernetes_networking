@@ -1,0 +1,73 @@
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.9.4/deploy/static/provider/cloud/deploy.yaml
+
+
+kubectl get svc -n ingress-nginx ingress-nginx-controller
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: foo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: foo
+  template:
+    metadata:
+      labels:
+        app: foo
+    spec:
+      containers:
+      - name: nginx
+        image: nginx
+        ports:
+        - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: foo
+spec:
+  selector:
+    app: foo
+  ports:
+  - port: 80
+    targetPort: 80
+
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: demo-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+  - http:
+      paths:
+      - path: /foo
+        pathType: Prefix
+        backend:
+          service:
+            name: foo
+            port:
+              number: 80
+      - path: /bar
+        pathType: Prefix
+        backend:
+          service:
+            name: bar
+            port:
+              number: 80
+
+
+kubectl apply -f foo-deploy.yaml
+kubectl apply -f bar-deploy.yaml
+kubectl apply -f ingress.yaml
+
+
+curl http://192.168.56.200/foo
+curl http://192.168.56.200/bar
+

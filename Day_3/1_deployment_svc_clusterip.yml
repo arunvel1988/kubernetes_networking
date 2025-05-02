@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp
+  labels:
+    app: myapp
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: myapp
+  template:
+    metadata:
+      labels:
+        app: myapp
+    spec:
+      containers:
+      - name: nginx
+        image: nginx
+        ports:
+        - containerPort: 80
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: myapp-clusterip
+spec:
+  type: ClusterIP
+  selector:
+    app: myapp
+  ports:
+  - port: 80
+    targetPort: 80
+
+---
+
+kubectl apply -f .
+
+---
+
+kubectl run curlpod --image=radial/busyboxplus:curl -i --tty --rm
+curl myapp-clusterip
+
+---

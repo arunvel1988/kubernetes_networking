@@ -1,0 +1,45 @@
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.13.10/config/manifests/metallb-native.yaml
+
+
+kubectl get pods -n metallb-system
+
+
+ip a | grep inet
+
+
+# metallb-config.yaml
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: local-pool
+  namespace: metallb-system
+spec:
+  addresses:
+  - 192.168.56.200-192.168.56.210
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: advert
+  namespace: metallb-system
+
+
+kubectl apply -f metallb-config.yaml
+
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: myapp-lb
+spec:
+  type: LoadBalancer
+  selector:
+    app: myapp
+  ports:
+  - port: 80
+    targetPort: 80
+
+
+kubectl get svc myapp-lb
+
+
