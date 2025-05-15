@@ -1,0 +1,219 @@
+#!/bin/bash
+
+# Prompt wrapper
+prompt_user() {
+    read -p "$1: " input
+    echo "$input"
+}
+
+# Function to get and use the current context
+use_current_context() {
+    current_context=$(kubectl config current-context)
+    if [[ -z "$current_context" ]]; then
+        echo "❌ No current kubectl context is set. Please configure your kubeconfig."
+        exit 1
+    fi
+    echo "✅ Current kubectl context is: $current_context"
+    echo "🔄 Verifying access to the cluster..."
+    kubectl cluster-info || echo "❌ Unable to access cluster using current context."
+}
+
+# Main
+echo "🚀 Welcome to the Local Kubernetes Cluster Manager! 🚀"
+use_current_context
+
+# Function to get resources in a namespace
+get_resources() {
+    local namespace="$1"
+    local resource_type="$2"
+    
+    kubectl get $resource_type -n "$namespace" --no-headers | awk '{print $1}'
+}
+
+# Function to describe a resource
+describe_resource() {
+    local namespace="$1"
+    local resource_type="$2"
+    local resource_name="$3"
+   
+    kubectl describe $resource_type -n "$namespace" "$resource_name"
+}
+
+# Function to get pod logs
+get_pod_logs() {
+    local namespace="$1"
+    local pod="$2"
+    
+    echo "📜 Getting logs for pod $pod in namespace $namespace..."
+    echo "[1] View recent logs and return to menu"
+    echo "[2] Follow logs in real-time (Ctrl+C to exit)"
+    log_option=$(prompt_user "Enter your choice")
+
+    case $log_option in
+        1)
+            echo "Recent logs for $pod:"
+            kubectl logs -n "$namespace" "$pod" --tail=50
+            ;;
+        2)
+            echo "Following logs for $pod (Ctrl+C to exit):"
+            kubectl logs -n "$namespace" "$pod" -f
+            ;;
+        *)
+            echo "❌ Invalid option. Showing recent logs..."
+            kubectl logs -n "$namespace" "$pod" --tail=50
+            ;;
+    esac
+}
+
+# Function to exec into a pod
+exec_into_pod() {
+    local namespace="$1"
+    local pod="$2"
+    
+    echo "🖥️ Exec into pod $pod in namespace $namespace..."
+    kubectl exec -it -n "$namespace" "$pod" -- /bin/bash || kubectl exec -it -n "$namespace" "$pod" -- /bin/sh
+}
+
+# Function to delete pod
+delete_pod() {
+    local namespace="$1"
+    local pod="$2"
+
+    echo "🚨 You are about to delete pod '$pod' in namespace '$namespace'."
+    read -p "Are you sure you want to proceed? (yes/no): " confirm1
+    
+    if [[ $confirm1 != "yes" ]]; then
+        echo "❌ Pod deletion cancelled."
+        return
+    fi
+
+    echo "🚨 This action cannot be undone. Please confirm again."
+    read -p "Type 'DELETE' to confirm: " confirm2
+    
+    if [[ $confirm2 != "DELETE" ]]; then
+        echo "❌ Pod deletion cancelled."
+        return
+    fi
+
+    echo "🖥️ Deleting pod '$pod' in namespace '$namespace'..."
+    kubectl delete pod -n "$namespace" "$pod"
+    
+    if [[ $? -eq 0 ]]; then
+        echo "✅ Pod '$pod' in namespace '$namespace' has been deleted successfully."
+    else
+        echo "❌ Failed to delete pod '$pod' in namespace '$namespace'. Please check and try again."
+    fi
+}
+
+# Get namespaces
+namespaces=($(kubectl get namespaces --no-headers | awk '{print $1}'))
+
+# Display namespaces
+echo "🌐 Available namespaces:"
+for i in "${!namespaces[@]}"; do
+    echo "[$i] ${namespaces[$i]}"
+done
+
+# Prompt user for namespace
+namespace_index=$(prompt_user "Enter the index of the namespace you want to manage")
+selected_namespace=${namespaces[$namespace_index]}
+
+while true; do
+    echo "🔧 Management options for namespace $selected_namespace:"
+    echo "[1] Pods"
+    echo "[2] Services"
+    echo "[3] Jobs"
+    echo "[4] CronJobs"
+    echo "[5] Ingress"
+    echo "[6] Secrets"
+    echo "[7] ConfigMaps"
+    echo "[8] Deployments"
+    echo "[9] DaemonSets"
+    echo "[10] StatefulSets"
+    echo "[11] Change namespace"
+    echo "[12] Exit"
+
+    option=$(prompt_user "Enter your choice")
+
+    case $option in
+        1|2|3|4|5|6|7|8|9|10)
+            resource_types=("pods" "services" "jobs" "cronjobs" "ingress" "secrets" "configmaps" "deployments" "daemonsets" "statefulsets")
+            resource_type=${resource_types[$option-1]}
+            echo "📦 $resource_type in namespace $selected_namespace:"
+            kubectl get $resource_type -n $selected_namespace
+            resources=($(get_resources "$selected_namespace" "$resource_type"))
+            
+            echo "Choose an action:"
+            echo "[1] Describe a $resource_type"
+            if [[ "$resource_type" == "pods" ]]; then
+                echo "[2] Get pod logs"
+                echo "[3] Exec into pod"
+                echo "[4] Delete pod"
+            fi
+            
+            sub_option=$(prompt_user "Enter your choice")
+            case $sub_option in
+                1)
+                    for i in "${!resources[@]}"; do
+                        echo "[$i] ${resources[$i]}"
+                    done
+                    resource_index=$(prompt_user "Enter the index of the $resource_type to describe")
+                    describe_resource "$selected_namespace" "$resource_type" "${resources[$resource_index]}"
+                    ;;
+                2)
+                    if [[ "$resource_type" == "pods" ]]; then
+                        for i in "${!resources[@]}"; do
+                            echo "[$i] ${resources[$i]}"
+                        done
+                        pod_index=$(prompt_user "Enter the index of the pod to get logs for")
+                        get_pod_logs "$selected_namespace" "${resources[$pod_index]}"
+                    else
+                        echo "❌ Invalid option for this resource type."
+                    fi
+                    ;;
+                3)
+                    if [[ "$resource_type" == "pods" ]]; then
+                        for i in "${!resources[@]}"; do
+                            echo "[$i] ${resources[$i]}"
+                        done
+                        pod_index=$(prompt_user "Enter the index of the pod to exec into")
+                        exec_into_pod "$selected_namespace" "${resources[$pod_index]}"
+                    else
+                        echo "❌ Invalid option for this resource type."
+                    fi
+                    ;;
+                4)
+                    if [[ "$resource_type" == "pods" ]]; then
+                        for i in "${!resources[@]}"; do
+                            echo "[$i] ${resources[$i]}"
+                        done
+                        pod_index=$(prompt_user "Enter the index of the pod to delete")
+                        delete_pod "$selected_namespace" "${resources[$pod_index]}"
+                    else
+                        echo "❌ Invalid option for this resource type."
+                    fi
+                    ;;
+                *)
+                    echo "❌ Invalid option. Please try again."
+                    ;;
+            esac
+            ;;
+        11)
+            # Change namespace
+            echo "🌐 Available namespaces:"
+            for i in "${!namespaces[@]}"; do
+                echo "[$i] ${namespaces[$i]}"
+            done
+            namespace_index=$(prompt_user "Enter the index of the new namespace")
+            selected_namespace=${namespaces[$namespace_index]}
+            echo "✅ Switched to namespace $selected_namespace"
+            ;;
+        12)
+            echo "👋 Goodbye! Happy managing!"
+            exit 0
+            ;;
+        *)
+            echo "❌ Invalid option. Please try again."
+            ;;
+    esac
+done
